@@ -619,8 +619,8 @@ WRITE_TO_FIELD:
 	CALL PUTS
 	POP SI
 
-	AND AX, 0x001F
-	JNZ .NO_DECREASE ; Every 32 lines cleared increase the falling speed.
+	AND AX, 0x000F
+	JNZ .NO_DECREASE ; Every 16 lines cleared increase the falling speed.
 
 	CMP WORD[FALL_DELAY], 150 ; If the falling speed is already to high then don't.
 	JLE .NO_DECREASE
