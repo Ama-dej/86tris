@@ -3,6 +3,7 @@
 
 %DEFINE TETROMINO_OFFSET 0x010E ; y : x offset of the field and other stuff.
 %DEFINE SCORE_OFFSET 0x0B1D
+%DEFINE PAUSED_MESSAGE_LOC 0x0B03
 
 BOOT:
 	XOR AX, AX
@@ -444,6 +445,47 @@ SKIP_INPUT:
 	CMP AL, ' '
 	JE SPACE_PRESSED
 
+	CMP AL, 'p'
+	JE P_PRESSED
+
+	JMP DELAY
+
+P_PRESSED: ; Pause the game.
+	CMP WORD[PAUSED_DELAY], 0 ; So you can't spam the pause key.
+	JNZ DELAY
+
+	MOV AX, WORD[FALL_DELAY]
+	SHL AX, 1
+	ADD AX, WORD[FALL_DELAY]
+	MOV WORD[PAUSED_DELAY], AX ; Reset the delay.
+
+	MOV AH, 0x02
+	XOR BX, BX
+	MOV DX, PAUSED_MESSAGE_LOC 
+	INT 0x10 ; Change cursor location to the left side of the screen.
+
+	MOV SI, PAUSED_MSG
+	CALL PUTS
+
+.WAIT_FOR_P_PRESS:
+	MOV AH, 0x00 
+	INT 0x16
+
+	OR AL, 0b00100000
+
+	CMP AL, 'p'
+	JNE .WAIT_FOR_P_PRESS
+
+	MOV AH, 0x02
+	XOR BX, BX
+	MOV DX, PAUSED_MESSAGE_LOC 
+	INT 0x10 ; Change cursor back to clear the string.
+
+	MOV SI, CLEAR_PAUSED_MSG
+	CALL PUTS
+
+	MOV SI, 1 ; After unpausing force the piece to fall down (so the player can't cheat by spamming the pause button).
+	
 	JMP DELAY
 
 W_PRESSED:
@@ -746,6 +788,11 @@ DELAY:
 	MOV DX, 0x03E8
 	INT 0x15 ; Wait for 1ms.
 
+	OR WORD[PAUSED_DELAY], 0
+	JZ .SKIP
+	DEC WORD[PAUSED_DELAY]
+
+.SKIP:
 	DEC SI
 	JNZ START ; Wait N times for 1ms so it looks like a N ms delay.
 
@@ -881,6 +928,10 @@ GEN_FIRST_PIECE: ; When we start a new game there are some things we have to do 
 HALT:
 	HLT
 	JMP SHORT HALT
+
+PAUSED_MSG: DB "Paused", 0x00 ; This message is here because the boot sector ran out of space.
+CLEAR_PAUSED_MSG: DB "      ", 0x00
+PAUSED_DELAY: DW 1050
 
 TIMES 2048 - ($ - $$) DB 0
 HIGH_SCORE: DW 0
