@@ -430,17 +430,29 @@ START:
 	OR AL, 0b00100000 ; Convert to lowercase (so it works even if caps lock is on).
 
 SKIP_INPUT:
+	CMP AH, 0x48 ; Up arrow.
+	JE UP_PRESSED
+
+	CMP AH, 0x50 ; Down arrow.
+	JE DOWN_PRESSED
+
+	CMP AH, 0x4B ; Left arrow.
+	JE LEFT_PRESSED
+
+	CMP AH, 0x4D ; Right arrow.
+	JE RIGHT_PRESSED
+
 	CMP AL, 'w'
-	JE W_PRESSED
+	JE UP_PRESSED
 
 	CMP AL, 's'
-	JE S_PRESSED
+	JE DOWN_PRESSED
 
 	CMP AL, 'a'
-	JE A_PRESSED
+	JE LEFT_PRESSED
 
 	CMP AL, 'd'
-	JE D_PRESSED
+	JE RIGHT_PRESSED
 
 	CMP AL, ' '
 	JE SPACE_PRESSED
@@ -455,7 +467,7 @@ P_PRESSED: ; Pause the game.
 	JNZ DELAY
 
 	MOV AX, WORD[FALL_DELAY]
-	SHL AX, 1
+	SHL AX, 2
 	ADD AX, WORD[FALL_DELAY]
 	MOV WORD[PAUSED_DELAY], AX ; Reset the delay.
 
@@ -488,24 +500,24 @@ P_PRESSED: ; Pause the game.
 	
 	JMP DELAY
 
-W_PRESSED:
+UP_PRESSED:
 	ADD WORD[TETROMINO_ROTATION], 8 ; "Rotate" right (each tetromino image is 8 bytes large).
 	AND WORD[TETROMINO_ROTATION], 0x001F ; So it doesn't overflow.
 
 	JMP CHECK_MOVE 
 
-S_PRESSED:
+DOWN_PRESSED:
 	SUB WORD[TETROMINO_ROTATION], 8 ; Same thing but "rotate" left.
 	AND WORD[TETROMINO_ROTATION], 0x001F
 
 	JMP CHECK_MOVE 
 
-A_PRESSED:
+LEFT_PRESSED:
 	DEC BYTE[TETROMINO_X] ; If we want to go left decrement the X coordinate.
 
 	JMP CHECK_MOVE 
 
-D_PRESSED:
+RIGHT_PRESSED:
 	INC BYTE[TETROMINO_X] ; Same thing as going left but instead increment.
 
 	JMP CHECK_MOVE 
@@ -931,7 +943,7 @@ HALT:
 
 PAUSED_MSG: DB "Paused", 0x00 ; This message is here because the boot sector ran out of space.
 CLEAR_PAUSED_MSG: DB "      ", 0x00
-PAUSED_DELAY: DW 1050
+PAUSED_DELAY: DW 0
 
 TIMES 2048 - ($ - $$) DB 0
 HIGH_SCORE: DW 0
