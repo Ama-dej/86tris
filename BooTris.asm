@@ -897,6 +897,8 @@ NOT_BEATEN:
 	DEC DI
 	JNZ .CLEAR_FIELD_GRAPHICS
 
+	MOV WORD[FALL_DELAY], 350
+
 GEN_FIRST_PIECE: ; When we start a new game there are some things we have to do first.
 	MOV AH, 0x02
 	XOR BX, BX
