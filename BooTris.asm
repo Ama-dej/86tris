@@ -427,11 +427,6 @@ START:
 	MOV AH, 0x00
 	INT 0x16 ; Get the key.
 
-	CMP AL, 0
-	JE DELAY
-
-	OR AL, 0b00100000 ; Convert to lowercase (so it works even if caps lock is on).
-
 SKIP_INPUT:
 	CMP AH, 0x48 ; Up arrow.
 	JE UP_PRESSED
@@ -444,6 +439,11 @@ SKIP_INPUT:
 
 	CMP AH, 0x4D ; Right arrow.
 	JE RIGHT_PRESSED
+
+	CMP AL, 0
+	JE DELAY
+
+	OR AL, 0b00100000 ; Convert to lowercase (so it works even if caps lock is on).
 
 	CMP AL, 'w'
 	JE UP_PRESSED
