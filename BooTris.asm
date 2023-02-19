@@ -427,6 +427,9 @@ START:
 	MOV AH, 0x00
 	INT 0x16 ; Get the key.
 
+	CMP AL, 0
+	JE DELAY
+
 	OR AL, 0b00100000 ; Convert to lowercase (so it works even if caps lock is on).
 
 SKIP_INPUT:
@@ -506,11 +509,43 @@ UP_PRESSED:
 
 	JMP CHECK_MOVE 
 
-DOWN_PRESSED:
-	SUB WORD[TETROMINO_ROTATION], 8 ; Same thing but "rotate" left.
-	AND WORD[TETROMINO_ROTATION], 0x001F
+SPACE_PRESSED: ; Hard drop.
+	MOV BX, WORD[TETROMINO_CUR_BUFFER]
+	ADD BX, WORD[TETROMINO_ROTATION]
 
-	JMP CHECK_MOVE 
+.NEXT_Y: ; Go for 1 Y down until you hit something.
+	INC BYTE[TETROMINO_Y]
+	PUSH BX
+	MOV DI, 4
+
+.CHECK_OVERLAP:	
+	MOV DX, WORD[BX]
+
+	PUSH BX
+
+	MOV BX, FIELD_DATA
+	ADD DH, BYTE[TETROMINO_Y]
+	MOVZX CX, DH
+	SHL CX, 1
+	ADD BX, CX ; Get the corresponding field data.
+
+	MOV AX, WORD[BX]
+	ADD DL, BYTE[TETROMINO_X]
+	MOV CL, 9
+	SUB CL, DL
+	SHR AX, CL ; This is done by shifting the bit in the y coordinate of the block by x times to the right.
+	AND AX, 0x0001
+
+	POP BX
+	JNZ WRITE_TO_FIELD ; If there is a one it means our piece overlaps. 
+	ADD BX, 2
+
+	DEC DI
+	JNZ .CHECK_OVERLAP
+
+	POP BX
+	CALL UPDATE_PIECE
+	JMP .NEXT_Y
 
 LEFT_PRESSED:
 	DEC BYTE[TETROMINO_X] ; If we want to go left decrement the X coordinate.
@@ -522,7 +557,7 @@ RIGHT_PRESSED:
 
 	JMP CHECK_MOVE 
 
-SPACE_PRESSED:
+DOWN_PRESSED:
 	INC BYTE[TETROMINO_Y] ; Go down.
 
 	MOV BX, WORD[TETROMINO_CUR_BUFFER]
@@ -748,51 +783,8 @@ REVERT:
 
 	JMP DELAY
 
-MOVE: ; Give the illusion of movement.
-	MOV BX, WORD[TETROMINO_PREV_BUFFER]
-	MOV DI, 4
-
-.CLEAR_LOOP: ; First clear the previous location.
-	MOV DX, WORD[BX]
-	ADD DL, BYTE[TETROMINO_PREV_X] 
-	ADD DH, BYTE[TETROMINO_PREV_Y]
-	ADD DX, TETROMINO_OFFSET
-
-	PUSH BX
-	MOV BX, 0x0007
-	CALL WRITE_BLOCK
-	POP BX
-
-	ADD BX, 2
-
-	DEC DI
-	JNZ .CLEAR_LOOP
-
-	MOV BX, WORD[TETROMINO_CUR_BUFFER]
-	ADD BX, WORD[TETROMINO_ROTATION]
-	MOV DI, 4
-
-.WRITE_LOOP: ; Then write the new location.
-	MOV DX, WORD[BX]
-	ADD DL, BYTE[TETROMINO_X]
-	ADD DH, BYTE[TETROMINO_Y]
-	ADD DX, TETROMINO_OFFSET
-
-	PUSH BX
-	XOR BH, BH
-	MOV BL, BYTE[TETROMINO_COLOUR]
-	CALL WRITE_BLOCK
-	POP BX
-
-	ADD BX, 2
-
-	DEC DI
-	JNZ .WRITE_LOOP
-
-	SUB BX, 8
-	MOV WORD[TETROMINO_PREV_BUFFER], BX
-	MOV AX, WORD[TETROMINO_COORDS]
-	MOV WORD[TETROMINO_PREV_COORDS], AX
+MOVE:
+	CALL UPDATE_PIECE
 
 DELAY:
 	MOV AH, 0x86
@@ -809,8 +801,8 @@ DELAY:
 	JNZ START ; Wait N times for 1ms so it looks like a N ms delay.
 
 	MOV SI, WORD[FALL_DELAY] ; Reset the counter.
-	MOV AL, ' ' ; It's stupid but it works.
-	JMP SKIP_INPUT 
+	; MOV AL, ' ' ; It's stupid but it works.
+	JMP DOWN_PRESSED 
 
 GAME_OVER:
 	MOV AH, 0x02
@@ -942,6 +934,57 @@ GEN_FIRST_PIECE: ; When we start a new game there are some things we have to do 
 HALT:
 	HLT
 	JMP SHORT HALT
+
+UPDATE_PIECE:
+	PUSHA
+
+	MOV BX, WORD[TETROMINO_PREV_BUFFER]
+	MOV DI, 4
+
+.CLEAR_LOOP: ; First clear the previous location.
+	MOV DX, WORD[BX]
+	ADD DL, BYTE[TETROMINO_PREV_X] 
+	ADD DH, BYTE[TETROMINO_PREV_Y]
+	ADD DX, TETROMINO_OFFSET
+
+	PUSH BX
+	MOV BX, 0x0007
+	CALL WRITE_BLOCK
+	POP BX
+
+	ADD BX, 2
+
+	DEC DI
+	JNZ .CLEAR_LOOP
+
+	MOV BX, WORD[TETROMINO_CUR_BUFFER]
+	ADD BX, WORD[TETROMINO_ROTATION]
+	MOV DI, 4
+
+.WRITE_LOOP: ; Then write the new location.
+	MOV DX, WORD[BX]
+	ADD DL, BYTE[TETROMINO_X]
+	ADD DH, BYTE[TETROMINO_Y]
+	ADD DX, TETROMINO_OFFSET
+
+	PUSH BX
+	XOR BH, BH
+	MOV BL, BYTE[TETROMINO_COLOUR]
+	CALL WRITE_BLOCK
+	POP BX
+
+	ADD BX, 2
+
+	DEC DI
+	JNZ .WRITE_LOOP
+
+	SUB BX, 8
+	MOV WORD[TETROMINO_PREV_BUFFER], BX
+	MOV AX, WORD[TETROMINO_COORDS]
+	MOV WORD[TETROMINO_PREV_COORDS], AX
+
+	POPA
+	RET
 
 PAUSED_MSG: DB "Paused", 0x00 ; This message is here because the boot sector ran out of space.
 CLEAR_PAUSED_MSG: DB "      ", 0x00
