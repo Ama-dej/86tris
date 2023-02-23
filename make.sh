@@ -1,2 +1,2 @@
 #!/bin/bash
-nasm -f bin BooTris.asm -o BooTris.bin
+nasm -f bin 86tris.asm -o 86tris.bin
